@@ -1,0 +1,5 @@
+*.dat
+*.zip
+.history/
+.idea/
+*.html
