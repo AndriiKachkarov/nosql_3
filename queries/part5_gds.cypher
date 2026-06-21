@@ -20,7 +20,7 @@ MERGE (m1)-[co:CO_RATED]-(m2)
 SET co.weight = weight;
 
 // Display some of the CO_RATED edges to verify the graph structure
-MATCH (m1:Movie)-[co:CO_RATED]->(m2:Movie) RETURN m1, co, m2 LIMIT 30
+MATCH (m1:Movie)-[co:CO_RATED]->(m2:Movie) RETURN m1, co, m2 LIMIT 30;
 
 // Step 2: Create GDS projection based on materialized edges
 CALL gds.graph.project(
@@ -65,7 +65,7 @@ MERGE (u1)-[sim:SIMILAR]-(u2)
 SET sim.weight = weight;
 
 // Display some of the SIMILAR edges to verify the graph structure
-MATCH (u1:User)-[sim:SIMILAR]->(u2:User) RETURN u1, sim, u2 LIMIT 30
+MATCH (u1:User)-[sim:SIMILAR]->(u2:User) RETURN u1, sim, u2 LIMIT 30;
 
 // Step 2: Create GDS projection for user similarity graph
 CALL gds.graph.project(
@@ -100,73 +100,6 @@ RETURN communityId, size, topGenres;
 // Step 5: Drop projection and temporary edges
 CALL gds.graph.drop('userSimilarity');
 MATCH ()-[sim:SIMILAR]-() DELETE sim;
-
-
-// ===================
-// 5.3 Shortest Path (Dijkstra) between Users
-// ===================
-
-// Recreate user similarity graph (same as Louvain)
-MATCH (u1:User)-[r1:RATED]->(m:Movie)<-[r2:RATED]-(u2:User)
-WHERE r1.rating = 5 AND r2.rating = 5 AND id(u1) < id(u2)
-WITH u1, u2, count(m) AS weight
-WITH u1, u2, weight
-ORDER BY weight DESC
-LIMIT 10000
-MERGE (u1)-[sim:SIMILAR]-(u2)
-SET sim.weight = weight;
-
-CALL gds.graph.project(
-  'userGraph',
-  'User',
-  { SIMILAR: { orientation: 'UNDIRECTED', properties: 'weight' } }
-)
-YIELD graphName, nodeCount, relationshipCount;
-
-// Run Dijkstra shortest path between two users
-// Pair 1: two high-degree users (4277 and 1285)
-MATCH (source:User {userId: 4277}), (target:User {userId: 1285})
-CALL gds.shortestPath.dijkstra.stream('userGraph', {
-  sourceNode: source,
-  targetNode: target,
-  relationshipWeightProperty: 'weight'
-})
-YIELD totalCost, nodeIds
-RETURN
-  [nodeId IN nodeIds | gds.util.asNode(nodeId).userId] AS userPath,
-  totalCost,
-  size(nodeIds) AS pathLength;
-
-// Pair 2: userId=4277 and userId=549
-MATCH (source:User {userId: 4277}), (target:User {userId: 549})
-CALL gds.shortestPath.dijkstra.stream('userGraph', {
-  sourceNode: source,
-  targetNode: target,
-  relationshipWeightProperty: 'weight'
-})
-YIELD totalCost, nodeIds
-RETURN
-  [nodeId IN nodeIds | gds.util.asNode(nodeId).userId] AS userPath,
-  totalCost,
-  size(nodeIds) AS pathLength;
-
-// Pair 3: userId=5100 and userId=3539
-MATCH (source:User {userId: 5100}), (target:User {userId: 3539})
-CALL gds.shortestPath.dijkstra.stream('userGraph', {
-  sourceNode: source,
-  targetNode: target,
-  relationshipWeightProperty: 'weight'
-})
-YIELD totalCost, nodeIds
-RETURN
-  [nodeId IN nodeIds | gds.util.asNode(nodeId).userId] AS userPath,
-  totalCost,
-  size(nodeIds) AS pathLength;
-
-// Cleanup
-CALL gds.graph.drop('userGraph');
-MATCH ()-[sim:SIMILAR]-() DELETE sim;
-
 
 
 // ============================================================================
